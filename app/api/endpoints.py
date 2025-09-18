@@ -184,3 +184,94 @@ def get_piores(db:Session= Depends(get_db), current_user: User = Depends(get_cur
     for diretor, faturamento in melhores:
         melhores_list.append({"diretor_empresa": diretor, "faturamento_anual": faturamento})
     return melhores_list
+
+
+@router.post("/faturamento/", response_model=api_schemas.Faturamento)
+def create_faturamento(faturamento: api_schemas.FaturamentoBase, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    empresa_existe = db.query(api_models.Empresas).filter(api_models.Empresas.id_empresa == faturamento.id_empresa).first()
+    if not empresa_existe:
+        raise HTTPException(status_code=404, detail=f"Empresa com ID {faturamento.id_empresa} não encontrada.")
+    
+    db_faturamento = api_models.Faturamento(**faturamento.model_dump())
+    db.add(db_faturamento)
+    db.commit()
+    db.refresh(db_faturamento)
+    return db_faturamento
+
+@router.post("/produtos_vendidos/", response_model=api_schemas.ProdutosVendidos)
+def create_produtos_vendidos(produto_vendido: api_schemas.ProdutosVendidosBase, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    faturamento_existe = db.query(api_models.Faturamento).filter(api_models.Faturamento.id_faturamento == produto_vendido.id_faturamento).first()
+    if not faturamento_existe:
+        raise HTTPException(status_code=404, detail=f"Faturamento com ID {produto_vendido.id_faturamento} não encontrado.")
+
+    db_produto = api_models.ProdutosVendidos(**produto_vendido.model_dump())
+    db.add(db_produto)
+    db.commit()
+    db.refresh(db_produto)
+    return db_produto
+
+
+@router.put("/faturamento/{id_faturamento}", response_model=api_schemas.FaturamentoBase)
+def update_faturamento(id_faturamento: int, faturamento_data: api_schemas.FaturamentoUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db_faturamento = db.query(api_models.Faturamento).filter(api_models.Faturamento.id_faturamento == id_faturamento).first()
+    if not db_faturamento:
+        raise HTTPException(status_code=404, detail="Faturamento não encontrado.")
+    
+    update_data = faturamento_data.model_dump(exclude_unset=True)
+    if "id_empresa" in update_data:
+        empresa_existe = db.query(api_models.Empresas).filter(api_models.Empresas.id_empresa == update_data["id_empresa"]).first()
+        if not empresa_existe:
+            raise HTTPException(status_code=404, detail=f"Empresa com ID {update_data['id_empresa']} não encontrada.")
+    
+    for key, value in update_data.items():
+        setattr(db_faturamento, key, value)
+    
+    db.commit()
+    db.refresh(db_faturamento)
+    return db_faturamento
+    
+
+@router.put("/produtos_vendidos/{id_venda}", response_model=api_schemas.ProdutosVendidos)
+def update_produtos_vendidos(id_venda: int, produto_data: api_schemas.ProdutosVendidosUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db_produto = db.query(api_models.ProdutosVendidos).filter(api_models.ProdutosVendidos.id_venda == id_venda).first()
+    if not db_produto:
+        raise HTTPException(status_code=404, detail="Venda de produto não encontrada.")
+    
+    update_data = produto_data.model_dump(exclude_unset=True)
+    if "id_faturamento" in update_data:
+        faturamento_existe = db.query(api_models.Faturamento).filter(api_models.Faturamento.id_faturamento == update_data["id_faturamento"]).first()
+        if not faturamento_existe:
+            raise HTTPException(status_code=404, detail=f"Faturamento com ID {update_data['id_faturamento']} não encontrado.")
+    
+    for key, value in update_data.items():
+        setattr(db_produto, key, value)
+    
+    db.commit()
+    db.refresh(db_produto)
+    return db_produto
+
+@router.get("/produtos_vendidos/")
+def read_produtos_vendidos(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt = select(api_models.ProdutosVendidos)
+    produtos = db.execute(stmt).scalars().all()
+    return produtos
+
+
+@router.get("/faturamento_mensal_por_empresa/")
+def get_faturamento_mensal(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt = select(api_models.Empresas.nome_empresa, api_models.Faturamento.faturamento_mensal).join(api_models.Faturamento)
+    faturamento_mensal = db.execute(stmt).all()
+    faturamento_mensal_list = []
+    for empresa, faturamento in faturamento_mensal:
+        faturamento_mensal_list.append({"nome_empresa": empresa, "faturamento_mensal": faturamento})
+    return faturamento_mensal_list
+
+
+@router.get("/media_notas_diretor/")
+def get_media_notas_diretor(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt = select(api_models.Empresas.diretor_empresa, func.avg(api_models.AvaliacoesDiretorEmpresa.nota_diretor).label("media_nota")).join(api_models.AvaliacoesDiretorEmpresa).group_by(api_models.Empresas.diretor_empresa)
+    notas = db.execute(stmt).all()
+    notas_list = []
+    for diretor, media in notas:
+        notas_list.append({"diretor_empresa": diretor, "media_nota": media})
+    return notas_list

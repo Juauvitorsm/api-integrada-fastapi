@@ -17,8 +17,10 @@ class FaturamentoBase(BaseModel):
     faturamento_mensal: float
     faturamento_anual: float
 
-class FaturamentoCreate(FaturamentoBase):
-    id_faturamento: int
+class FaturamentoUpdate(BaseModel):
+    id_empresa: int | None = None
+    faturamento_mensal: float | None = None
+    faturamento_anual: float | None = None
 
 class Faturamento(FaturamentoBase):
     id_faturamento: int
@@ -30,8 +32,10 @@ class ProdutosVendidosBase(BaseModel):
     nome_produto: str
     produtos_vendidos: int
 
-class ProdutosVendidosCreate(ProdutosVendidosBase):
-    id_venda: int
+class ProdutosVendidosUpdate(BaseModel):
+    id_faturamento: int | None = None
+    nome_produto: str | None = None
+    produtos_vendidos: int | None = None
 
 class ProdutosVendidos(ProdutosVendidosBase):
     id_venda: int
