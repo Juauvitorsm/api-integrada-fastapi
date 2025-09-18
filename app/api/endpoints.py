@@ -175,4 +175,12 @@ def get_maior_lucro(db: Session = Depends(get_db), current_user: User = Depends(
 
     return melhores
 
-
+@router.get("/melhoresdiretores/")
+def get_piores(db:Session= Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt= select(api_models.Empresas.diretor_empresa, api_models.Faturamento.faturamento_anual).join(api_models.Faturamento, api_models.Empresas.id_empresa== api_models.Faturamento.id_empresa).limit(4)
+    melhores = db.execute(stmt).all()
+    
+    melhores_list = []
+    for diretor, faturamento in melhores:
+        melhores_list.append({"diretor_empresa": diretor, "faturamento_anual": faturamento})
+    return melhores_list
